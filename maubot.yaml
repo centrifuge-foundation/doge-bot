@@ -1,0 +1,7 @@
+maubot: 0.1.0
+id: xyz.maubot.roombot
+version: 1.0.0
+license: MIT
+modules:
+  - roombot
+main_class: RoomBot

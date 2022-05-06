@@ -9,7 +9,7 @@ user:
     # Enable /sync? This is not needed for purely unencrypted webhook-based bots, but is necessary in most other cases.
     sync: true
     # Automatically accept invites?
-    autojoin: false
+    autojoin: true
     # The displayname and avatar URL to set for the bot on startup.
     # Set to "disable" to not change the the current displayname/avatar.
     displayname: Standalone Bot
@@ -25,17 +25,17 @@ user:
 server:
     # The IP and port to listen to.
     hostname: 0.0.0.0
-    port: 8080
+    port: 29316
     # The base path where the plugin's web resources will be served. Unlike the normal mode,
     # the webserver is dedicated for a single bot in standalone mode, so the default path
     # is just /. If you want to emulate normal mode, set this to /_matrix/maubot/plugin/something
-    base_path: /
+    base_path: /_matrix/maubot/v1
     # The public URL where the resources are available. The base path is automatically appended to this.
     public_url: https://example.com
 
 # The database for the plugin. Used for plugin data, the sync token and e2ee data (if enabled).
 # SQLite and Postgres are supported.
-database: sqlite:///bot.db
+database: sqlite:///maubot.db
 
 # Additional arguments for asyncpg.create_pool() or sqlite3.connect()
 # https://magicstack.github.io/asyncpg/current/api/index.html#asyncpg.pool.create_pool
