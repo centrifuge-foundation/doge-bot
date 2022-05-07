@@ -5,3 +5,5 @@ license: MIT
 modules:
   - roombot
 main_class: RoomBot
+database: true
+database_type: asyncpg
