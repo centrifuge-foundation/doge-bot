@@ -6,4 +6,4 @@ modules:
   - roombot
 main_class: RoomBot
 database: true
-database_type: asyncpg
+database_type: sqlalchemy
