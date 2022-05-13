@@ -2,7 +2,7 @@ from typing import Iterable, Optional
 
 from sqlalchemy.orm import Session, joinedload
 
-from .entities import Group, Room, User
+from .entity import Group, Room, User
 
 
 class DatabaseManager(Session):

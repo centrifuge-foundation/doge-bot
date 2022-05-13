@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from functools import wraps
 from io import StringIO
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from maubot import MessageEvent, Plugin
 from maubot.handlers import command
@@ -28,15 +28,26 @@ def synchronize(fn):
 
 
 class DogeBot(Plugin):
+    def listen(self, target, identifier, fn):
+        "Listen for database events in background process"
+        event.listen(target, identifier, lambda *args:
+                     self.loop.create_task(fn(*args)))
+
     async def start(self) -> None:
         await super().start()
 
         Base.metadata.create_all(self.database)
 
-        event.listen(Group.users, "append", self.invite_user_to_group_rooms)
-        event.listen(Group.users, "remove", self.remove_user_from_group_rooms)
-        event.listen(Group.rooms, "append", self.invite_group_users_to_room)
-        event.listen(Group.rooms, "remove", self.remove_group_users_from_room)
+        self.listen(Group.users, "append", lambda group, user, *_:
+                    self.invite_members(group, users=[user]))
+        self.listen(Group.users, "remove", lambda group, user, *_:
+                    self.remove_members(group, users=[user]))
+        self.listen(Group.rooms, "append", lambda group, room, *_:
+                    self.invite_members(group, rooms=[room]))
+        self.listen(Group.rooms, "remove", lambda group, room, *_:
+                    self.remove_members(group, rooms=[room]))
+        self.listen(Group, "delete", lambda group, *_:
+                    self.remove_members(group))
 
     @asynccontextmanager
     async def session(self, evt: Optional[MessageEvent] = None):
@@ -167,75 +178,37 @@ class DogeBot(Plugin):
             group.rooms.remove(room)
             await evt.respond("✅ Removed group **%s** from room %s" % (group.name, room.room_alias))
 
-    @synchronize
-    async def invite_user_to_group_rooms(self, group: Group, user: User, *_):
-        self.log.debug("Inviting user %s to group **%s** rooms",
-                       user.user_id, group.name)
+    async def invite_members(self, group: Group, rooms: Optional[List[Room]] = None, users: Optional[List[User]] = None):
+        for room in rooms or group.rooms:
+            self.log.debug("Inviting %s users to %s", group, room)
 
-        if not group.rooms:
-            self.log.debug("Group **%s** is not in any rooms")
+            members = await self.client.get_joined_members()
+            self.log.debug("%s members: %s", room, ", ".join(members.keys()))
 
-        for room in group.rooms:
-            if user.user_id in await self.client.get_joined_members(room.room_id):
-                self.log.debug("Not inviting user %s to room %s",
-                               user.user_id, room.room_alias_or_id)
-                continue
-
-            self.log.debug("Inviting user %s to room %s",
-                           user.user_id, room.room_alias_or_id)
-            await self.client.invite_user(room.room_id, user.user_id)
-
-    @synchronize
-    async def remove_user_from_group_rooms(self, group, user, *_):
-        self.log.debug("Removing user %s from group **%s** rooms",
-                       user.user_id, group.name)
-        async with self.session() as dbm:
-            if not group.rooms:
-                self.log.debug("Group **%s** is not in any rooms")
-            for room in group.rooms:
-                if any(group != other_group and user in other_group.users
-                       for other_group in dbm.find_groups_by_room(room)):
-                    self.log.debug("Not removing user %s from room %s",
-                                   user.user_id, room.room_alias_or_id)
+            for user in users or group.users:
+                if user in members:
+                    self.log.debug("Not inviting %s to %s", user, room)
                     continue
 
-                self.log.debug("Removing user %s from room %s",
-                               user.user_id, room.room_alias_or_id)
-                await self.client.kick_user(room.room_id, user.user_id)
+                self.log.debug("Inviting %s to %s", user, room)
+                await self.client.invite_user(room.room_id, user.user_id)
 
-    @synchronize
-    async def invite_group_users_to_room(self, group, room, *_):
-        self.log.debug("Inviting group **%s** users to room %s",
-                       group.name, room.room_id)
-        if not group.users:
-            self.log.debug("Group **%s** does not have any users")
-        for user in group.users:
-            if user.user_id in await self.client.get_joined_members(room.room_id):
-                self.log.debug("Not inviting user %s to room %s",
-                               user.user_id, room.room_alias_or_id)
-                continue
+    async def remove_members(self, group: Group, rooms: Optional[List[Room]] = None, users: Optional[List[User]] = None):
+        with self.session() as db:
+            for room in rooms or group.rooms:
+                self.log.debug("Inviting %s users to %s", group, room)
 
-            self.log.debug("Inviting user %s to room %s",
-                           user.user_id, room.room_alias_or_id)
-            await self.client.invite_user(room.room_id, user.user_id)
+                other_groups = [other_group for other_group in db.find_groups_by_room(
+                    room) if other_group != group]
+                self.log.debug("%s groups: %s", room, ", ".join(other_groups))
 
-    @synchronize
-    async def remove_group_users_from_room(self, group, room, *_):
-        self.log.debug("Removing group **%s** users from room %s",
-                       group.name, room.room_id)
-        async with self.session() as dbm:
-            if not group.users:
-                self.log.debug("Group **%s** does not have any users")
-            for user in group.users:
-                if any(group != other_group and user in other_group.users
-                       for other_group in dbm.find_groups_by_room(room)):
-                    self.log.debug("Not removing user %s from room %s",
-                                   user.user_id, room.room_alias_or_id)
-                    continue
+                for user in users or group.users:
+                    if user in other_group_users:
+                        self.log.debug("Not removing %s from %s", user, room)
+                        continue
 
-                self.log.debug("Removing user %s from room %s",
-                               user.user_id, room.room_alias_or_id)
-                await self.client.kick_user(room.room_id, user.user_id)
+                    self.log.debug("Removing user %s from %s", user, room)
+                    await self.client.kick_user(room.room_id, user.user_id)
 
     def parse_user_id(self, user_id: str) -> UserID:
         if not user_id.startswith("@"):
@@ -257,10 +230,8 @@ class DogeBot(Plugin):
         return RoomAlias(room_id_or_alias)
 
     async def resolve_room(self, room_id_or_alias: Union[RoomID, RoomAlias]) -> Room:
-        if room_id_or_alias.startswith("!"):
+        if (room_alias := room_id_or_alias).startswith("!"):
             return Room(room_id=room_id_or_alias)
-        else:
-            room_alias = room_id_or_alias
 
         try:
             info = await self.client.resolve_room_alias(room_alias)
