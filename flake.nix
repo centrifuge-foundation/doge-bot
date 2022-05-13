@@ -11,7 +11,7 @@
       let
         projectFiles = nix-filter.lib {
           root = ./.;
-          include = (map nix-filter.lib.inDirectory [ "roombot" ])
+          include = (map nix-filter.lib.inDirectory [ "doge" ])
             ++ [ "maubot.yaml" "poetry.lock" "pyproject.toml" ];
         };
         pythonWithPackages = pkgs.poetry2nix.mkPoetryEnv {
@@ -25,7 +25,7 @@
             python3Packages.poetry
           ];
         };
-        defaultPackage = writeShellScriptBin "roombot" ''
+        defaultPackage = writeShellScriptBin "doge" ''
           ${pythonWithPackages}/bin/python -m maubot.standalone \
             --meta ${projectFiles}/maubot.yaml "$@"
         '';

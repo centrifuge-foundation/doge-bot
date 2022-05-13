@@ -11,8 +11,8 @@ from mautrix.errors.request import MNotFound
 from mautrix.types import RoomAlias, RoomID, UserID
 from sqlalchemy import event
 
-from roombot.db import DatabaseManager
-from roombot.entity import Base, Group, Room, User
+from doge.db import DatabaseManager
+from doge.entity import Base, Group, Room, User
 
 
 class UserError(Exception):
@@ -27,7 +27,7 @@ def synchronize(fn):
     return wrapper
 
 
-class RoomBot(Plugin):
+class DogeBot(Plugin):
     async def start(self) -> None:
         await super().start()
 

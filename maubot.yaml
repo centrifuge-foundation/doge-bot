@@ -1,9 +1,9 @@
 maubot: 0.1.0
-id: xyz.maubot.roombot
+id: xyz.maubot.doge
 version: 1.0.0
 license: MIT
 modules:
-  - roombot
-main_class: RoomBot
+  - doge
+main_class: DogeBot
 database: true
 database_type: sqlalchemy

@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "roombot"
+name = "doge"
 version = "0.1.0"
 description = ""
 authors = ["Michael Pontus <m.pontus@gmail.com>"]
