@@ -2,13 +2,21 @@
 
 > Group management bot for [Matrix](matrix.io)
 
+## Setup
+
+[NixOS]() users can install the bot with the following command:
+
+```
+nix profile install github:kfactory-dev/doge-bot
+```
+
 ## Usage
 
-Copy [`example-config.yaml`](./example-config.yaml) and configure bot credentials.
+Copy [`example-config.yaml`](./example-config.yaml) to `config.yaml` and configure bot credentials.
 
-Start the bot in standalone mode by running `doge -c [config file]`.
+Start the bot in standalone mode by running `doge-bot -c <config path>`.
 
-### List of commands:
+### Available commands:
 
 - `!groups` - list all existing groups
 - `!create [group name]` - create a new group
@@ -18,36 +26,46 @@ Start the bot in standalone mode by running `doge -c [config file]`.
 - `!join [group name] [room alias or id]` - invite group members to the room
 - `!leave [group name] [room alias or id]` - remove group members from the room
 
+
+
 ## Development
 
+This project uses [Nix Flakes]() to provide the development environment and build pipeline.
 
+Run `nix develop` to enter the development environment, and `nix build` to build the bot.
 
-
+You can also use `python -m maubot.standalone` to run the bot in the development environment.
 
 ### Generating access token
 
-> This section describes a way to generate access token using Maubot API, but there may be other ways to generate a Matrix access tokens
+> The method described in this section uses Maubot server, but there are may be other ways to generate access token.
 
-Copy [example server configuration file](https://raw.githubusercontent.com/maubot/maubot/master/maubot/example-config.yaml), changing admin username and password, and adding your homeserver if necessary. 
+Copy [example server configuration file](https://raw.githubusercontent.com/maubot/maubot/master/maubot/example-config.yaml) changing admin username and password, and adding your homeserver if necessary.
 
-Start Maubot server, specifying path to the configuration file:
-
-```
-python -m maubot -c <config path>
-```
-
-Authenticate with the server using admin credentials from the configuration file:
+Start Maubot server, specifying path to the server configuration file:
 
 ```
+
+python -m maubot -c <server config path>
+
+```
+
+Authenticate with the server using admin credentials specified the configuration file:
+
+```
+
 mbc login -u <admin username>
+
 ```
 
 Generate access token, specifying a homeserver and a fully-qualified user id:
+
 ```
+
 mbc auth -h <homeserver> -u <user id>
+
 ```
 
+```
 
-## Development
-
-Enter the development environment by running `nix-shell` (or `nix develop` when using [Flakes](https://nixos.wiki/wiki/Flakes))
+```

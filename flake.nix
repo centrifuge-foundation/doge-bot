@@ -25,7 +25,7 @@
             python3Packages.poetry
           ];
         };
-        defaultPackage = writeShellScriptBin "doge" ''
+        defaultPackage = writeShellScriptBin "doge-bot" ''
           ${pythonWithPackages}/bin/python -m maubot.standalone \
             --meta ${projectFiles}/maubot.yaml "$@"
         '';
