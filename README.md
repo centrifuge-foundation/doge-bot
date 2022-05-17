@@ -10,21 +10,22 @@
 nix profile install github:kfactory-dev/doge-bot
 ```
 
-## Usage
-
 Copy [`example-config.yaml`](./example-config.yaml) to `config.yaml` and configure bot credentials.
+
+## Usage
 
 Start the bot in standalone mode by running `doge-bot -c <config path>`.
 
-### Available commands:
+**Available commands:**
 
 - `!groups` - list all existing groups
 - `!create [group name]` - create a new group
-- `!delete [group name]` - delete an existing group
-- `!add [group name] [user id]` - add a new member to the group
-- `!remove [group name] [user id]` - remove an exsiting member from the group
-- `!join [group name] [room alias or id]` - invite group members to the room
-- `!leave [group name] [room alias or id]` - remove group members from the room
+- `!rename [group name] [new name]` - rename a group
+- `!delete [group name]` - delete a group
+- `!add [group name] [user id]` - add member to the group
+- `!remove [group name] [user id]` - remove member from the group
+- `!join [group name] [room alias or id]` - invite group to the room
+- `!leave [group name] [room alias or id]` - remove group from the room
 
 ### Docker image
 
@@ -33,8 +34,9 @@ Start the bot in standalone mode by running `doge-bot -c <config path>`.
 You can also run the bot in a Docker container, by running the following command from the directory containing `config.yaml`:
 
 ```
-docker run -v $PWD:/data:z kfactory-dev/doge-bot -c /data/config.yaml
+docker run -v $PWD:/data:z -w /data kfactory-dev/doge-bot
 ```
+
 
 ## Development
 
