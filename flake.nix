@@ -9,27 +9,26 @@
     nix-utils.lib.eachDefaultSystem (system:
       with import nixpkgs { inherit system; };
       let
-        poetryEnv = pkgs.poetry2nix.mkPoetryEnv {
+        poetryEnv = poetry2nix.mkPoetryEnv {
           projectDir = ./.;
           python = python39;
           preferWheels = true;
         };
-        pythonModule = pkgs.poetry2nix.mkPoetryApplication {
+        pythonModule = poetry2nix.mkPoetryApplication {
           projectDir = ./.;
-          python = pkgs.python39;
+          python = python39;
           preferWheels = true;
         };
         pythonWithPackages = poetryEnv.withPackages (ps: [ pythonModule ]);
       in rec {
-        devShell = poetryEnv.env.overrideAttrs (oldAttrs: { 
-          buildInputs = [ pkgs.poetry ]; 
-        });
+        devShell =
+          poetryEnv.env.overrideAttrs (oldAttrs: { buildInputs = [ poetry ]; });
 
         defaultPackage = writeShellScriptBin "doge-bot" ''
           ${pythonWithPackages}/bin/python -m maubot.standalone -m ${./maubot.yaml} "$@"
         '';
 
-        packages.docker = pkgs.dockerTools.buildLayeredImage {
+        packages.docker = dockerTools.buildLayeredImage {
           name = "doge-bot";
           contents = [ pythonWithPackages ];
           config.Entrypoint =
