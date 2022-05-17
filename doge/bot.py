@@ -8,7 +8,7 @@ from typing import List, Optional, Union
 
 from maubot import MessageEvent, Plugin
 from maubot.handlers import command
-from mautrix.errors.request import MNotFound
+from mautrix.errors.request import MNotFound, MForbidden
 from mautrix.types import RoomAlias, RoomID, UserID
 from sqlalchemy import event
 
@@ -21,43 +21,10 @@ class UserError(Exception):
         super().__init__(msg % args)
 
 
-def synchronize(fn):
-    @wraps(fn)
-    def wrapper(self: Plugin, *args, **kwargs):
-        self.loop.create_task(fn(self, *args, **kwargs))
-    return wrapper
-
-
 class DogeBot(Plugin):
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._tasks = []
-
-    def listen(self, target, identifier, fn):
-        "Listen for database events in the background"
-        def listener(*args, **kwargs):
-            task = self.loop.create_task(fn(*args, **kwargs))
-            self.loop.run_until_complete(task)
-            # self._tasks.append(task)
-            # self._background.run_until_complete(task)
-            print("Task created")
-
-        event.listen(target, identifier, listener)
-
     async def start(self) -> None:
         await super().start()
-
         Base.metadata.create_all(self.database)
-
-        self.listen(Group.users, "append", lambda group, user, *_:
-                    self.invite_members(group, users=[user]))
-        self.listen(Group.users, "remove", lambda group, user, *_:
-                    self.remove_members(group, users=[user]))
-        self.listen(Group.rooms, "append", lambda group, room, *_:
-                    self.invite_members(group, rooms=[room]))
-        self.listen(Group.rooms, "remove", lambda group, room, *_:
-                    self.remove_members(group, rooms=[room]))
 
     @asynccontextmanager
     async def session(self, evt: Optional[MessageEvent] = None):
@@ -105,9 +72,27 @@ class DogeBot(Plugin):
                 raise UserError("Group **%s** already exist", group.name)
 
             dbm.add(group := Group(name=group_name))
+            dbm.commit()
+
             await evt.respond("✅ Group **%s** created" % (group.name))
 
-    @command.new(name="delete", help="Create a new group")
+    @command.new(name="rename", help="Change group name")
+    @command.argument("group_name", label="Group name")
+    @command.argument("new_name", label="New group name")
+    async def rename_group(self, evt: MessageEvent, group_name: str, new_name: str) -> None:
+        async with self.session(evt) as dbm:
+            if (group := dbm.get_group_by_name(group_name)) is None:
+                raise UserError("Group **%s** does not exists", group_name)
+
+            if dbm.get_group_by_name(new_name):
+                raise UserError("Group **%s** already exists", new_name)
+
+            group.name = new_name
+            dbm.commit()
+
+            await evt.respond("✅ Group **%s** renamed to **%s**" % (group_name, new_name))
+
+    @command.new(name="delete", help="Delete a group")
     @command.argument("group_name", label="Group name")
     async def delete_group(self, evt: MessageEvent, group_name: str) -> None:
         async with self.session(evt) as dbm:
@@ -115,6 +100,8 @@ class DogeBot(Plugin):
                 raise UserError("Group **%s** does not exists", group_name)
 
             dbm.delete(group)
+            dbm.commit()
+
             await self.remove_members(group)
             await evt.respond("✅ Group **%s** deleted" % (group.name))
 
@@ -131,6 +118,9 @@ class DogeBot(Plugin):
                                 user.user_id, group.name)
 
             group.users.append(user)
+            dbm.commit()
+
+            await self.invite_members(group, users=[user])
             await evt.respond("✅ Added user %s to group **%s**" % (user.user_id, group.name))
 
     @command.new(name="remove", help="Remove user from group")
@@ -146,6 +136,9 @@ class DogeBot(Plugin):
                                 user.user_id, group.name)
 
             group.users.remove(user)
+            dbm.commit()
+
+            await self.remove_members(group, users=[user])
             await evt.respond("✅ Removed user %s from group **%s**" % (user.user_id, group.name))
 
     @command.new(name="join", help="Add group to room")
@@ -166,6 +159,9 @@ class DogeBot(Plugin):
                 await self.client.join_room_by_id(room.room_id)
 
             group.rooms.append(room)
+            dbm.commit()
+
+            await self.invite_members(group, rooms=[room])
             await evt.respond("✅ Added group **%s** to room %s" % (group.name, room.room_alias))
 
     @command.new(name="leave", help="Remove group from room")
@@ -183,39 +179,53 @@ class DogeBot(Plugin):
                                 group.name, room.room_alias)
 
             group.rooms.remove(room)
+            dbm.commit()
+
+            await self.remove_members(group, rooms=[room])
             await evt.respond("✅ Removed group **%s** from room %s" % (group.name, room.room_alias))
 
     async def invite_members(self, group: Group, rooms: Optional[List[Room]] = None, users: Optional[List[User]] = None):
         for room in rooms or group.rooms:
-            self.log.debug("Inviting %s users to %s", group, room)
+            self.log.debug("Inviting group %s users to room %s",
+                           group.name, room.room_alias_or_id)
 
-            members = await self.client.get_joined_members()
-            self.log.debug("%s members: %s", room, ", ".join(members.keys()))
+            members = await self.client.get_joined_members(room.room_id)
+            self.log.debug("Room %s members: %s",
+                           room.room_alias_or_id, ", ".join(members.keys()))
 
             for user in users or group.users:
-                if user in members:
-                    self.log.debug("Not inviting %s to %s", user, room)
+                if user.user_id in members:
+                    self.log.debug("User %s is already in room %s",
+                                   user.user_id, room.room_alias_or_id)
                     continue
 
-                self.log.debug("Inviting %s to %s", user, room)
+                self.log.debug("Inviting user %s to room %s",
+                               user.user_id, room.room_alias_or_id)
                 await self.client.invite_user(room.room_id, user.user_id)
 
     async def remove_members(self, group: Group, rooms: Optional[List[Room]] = None, users: Optional[List[User]] = None):
-        with self.session() as db:
+        async with self.session() as db:
             for room in rooms or group.rooms:
-                self.log.debug("Inviting %s users to %s", group, room)
+                self.log.debug("Inviting group %s users to room %s",
+                               group.name, room.room_alias_or_id)
 
                 other_groups = [other_group for other_group in db.find_groups_by_room(
                     room) if other_group != group]
-                self.log.debug("%s groups: %s", room, ", ".join(other_groups))
+                self.log.debug("Room %s groups: %s", room.room_alias_or_id, ", ".join(
+                    group.name for group in other_groups))
 
                 for user in users or group.users:
-                    if user in other_group_users:
-                        self.log.debug("Not removing %s from %s", user, room)
+                    if gs := [group for group in other_groups if user in group.users]:
+                        self.log.debug("User %s is also in groups: %s",
+                                       user.user_id, ", ".join(group.name for group in gs))
                         continue
 
-                    self.log.debug("Removing user %s from %s", user, room)
-                    await self.client.kick_user(room.room_id, user.user_id)
+                    self.log.debug("Removing user %s from %s",
+                                   user.user_id, room.room_alias_or_id)
+                    try:
+                        await self.client.kick_user(room.room_id, user.user_id)
+                    except MForbidden as e:
+                        self.log.warn(e.message)
 
     def parse_user_id(self, user_id: str) -> UserID:
         if not user_id.startswith("@"):
