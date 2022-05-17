@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import asyncio
 from contextlib import asynccontextmanager
 from functools import wraps
 from io import StringIO
@@ -28,10 +29,21 @@ def synchronize(fn):
 
 
 class DogeBot(Plugin):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._tasks = []
+
     def listen(self, target, identifier, fn):
-        "Listen for database events in background process"
-        event.listen(target, identifier, lambda *args:
-                     self.loop.create_task(fn(*args)))
+        "Listen for database events in the background"
+        def listener(*args, **kwargs):
+            task = self.loop.create_task(fn(*args, **kwargs))
+            self.loop.run_until_complete(task)
+            # self._tasks.append(task)
+            # self._background.run_until_complete(task)
+            print("Task created")
+
+        event.listen(target, identifier, listener)
 
     async def start(self) -> None:
         await super().start()
@@ -46,8 +58,6 @@ class DogeBot(Plugin):
                     self.invite_members(group, rooms=[room]))
         self.listen(Group.rooms, "remove", lambda group, room, *_:
                     self.remove_members(group, rooms=[room]))
-        self.listen(Group, "delete", lambda group, *_:
-                    self.remove_members(group))
 
     @asynccontextmanager
     async def session(self, evt: Optional[MessageEvent] = None):
@@ -64,10 +74,6 @@ class DogeBot(Plugin):
             raise
         finally:
             dbm.close()
-
-    @command.new()
-    async def ping(self, evt: MessageEvent) -> None:
-        await evt.reply("pong")
 
     @command.new(name="groups", help="List existing groups")
     async def list_groups(self, evt: MessageEvent):
@@ -109,6 +115,7 @@ class DogeBot(Plugin):
                 raise UserError("Group **%s** does not exists", group_name)
 
             dbm.delete(group)
+            await self.remove_members(group)
             await evt.respond("✅ Group **%s** deleted" % (group.name))
 
     @command.new(name="add", help="Add user to group")

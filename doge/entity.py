@@ -18,7 +18,7 @@ class Group(Base):
         return isinstance(obj, Group) and obj.name == self.name
 
     def __str__(self) -> str:
-        return "Group(id=%r, name=%r)" % (self.id, self.name)
+        return "Group(%r, name=%r)" % (self.id, self.name)
 
 
 class User(Base):
@@ -29,6 +29,9 @@ class User(Base):
     def __eq__(self, obj: object) -> bool:
         return isinstance(obj, User) and obj.user_id == self.user_id
 
+    def __str__(self) -> str:
+        return "User(%r)" % (self.user_id)
+
 
 class Room(Base):
     __tablename__ = 'group_room'
@@ -38,6 +41,9 @@ class Room(Base):
 
     def __eq__(self, obj: object) -> bool:
         return isinstance(obj, Room) and obj.room_id == self.room_id
+
+    def __str__(self) -> str:
+        return "Room(%r, %r)" % (self.room_alias_or_id, self.room_alias)
 
     @property
     def room_alias_or_id(self):

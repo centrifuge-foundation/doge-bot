@@ -4,7 +4,7 @@
 
 ## Setup
 
-[NixOS]() users can install the bot with the following command:
+[NixOS](https://nixos.org/) users can install the bot with the following command:
 
 ```
 nix profile install github:kfactory-dev/doge-bot
@@ -26,11 +26,19 @@ Start the bot in standalone mode by running `doge-bot -c <config path>`.
 - `!join [group name] [room alias or id]` - invite group members to the room
 - `!leave [group name] [room alias or id]` - remove group members from the room
 
+### Docker image
 
+[![Docker image](https://img.shields.io/docker/image/kfactory-dev/doge-bot.svg)](https://hub.docker.com/r/kfactory-dev/doge-bot)
+
+You can also run the bot in a Docker container, by running the following command from the directory containing `config.yaml`:
+
+```
+docker run -v $PWD:/data:z kfactory-dev/doge-bot -c /data/config.yaml
+```
 
 ## Development
 
-This project uses [Nix Flakes]() to provide the development environment and build pipeline.
+This project uses [Nix Flakes](https://nixos.wiki/wiki/Flakes) to provide the development environment and build pipeline.
 
 Run `nix develop` to enter the development environment, and `nix build` to build the bot.
 
@@ -45,27 +53,17 @@ Copy [example server configuration file](https://raw.githubusercontent.com/maubo
 Start Maubot server, specifying path to the server configuration file:
 
 ```
-
 python -m maubot -c <server config path>
-
 ```
 
 Authenticate with the server using admin credentials specified the configuration file:
 
 ```
-
 mbc login -u <admin username>
-
 ```
 
 Generate access token, specifying a homeserver and a fully-qualified user id:
 
 ```
-
 mbc auth -h <homeserver> -u <user id>
-
-```
-
-```
-
 ```

@@ -9,26 +9,35 @@
     nix-utils.lib.eachDefaultSystem (system:
       with import nixpkgs { inherit system; };
       let
-        projectFiles = nix-filter.lib {
-          root = ./.;
-          include = (map nix-filter.lib.inDirectory [ "doge" ])
-            ++ [ "maubot.yaml" "poetry.lock" "pyproject.toml" ];
-        };
-        pythonWithPackages = pkgs.poetry2nix.mkPoetryEnv {
+        poetryEnv = pkgs.poetry2nix.mkPoetryEnv {
           projectDir = ./.;
+          python = python39;
           preferWheels = true;
         };
-      in {
-        devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            pythonWithPackages
-            python3Packages.poetry
-          ];
-        };
+      in rec {
+        devShell = poetryEnv.env.overrideAttrs (oldAttrs: { 
+          buildInputs = [ pkgs.poetry ]; 
+        });
+
         defaultPackage = writeShellScriptBin "doge-bot" ''
-          ${pythonWithPackages}/bin/python -m maubot.standalone \
-            --meta ${projectFiles}/maubot.yaml "$@"
+          ${poetryEnv}/bin/python -m maubot.standalone -m${./maubot.yaml} "$@"
         '';
+
+        packages.docker = let
+          package = pkgs.poetry2nix.mkPoetryApplication {
+            projectDir = ./.;
+            python = pkgs.python39;
+            preferWheels = true;
+          };
+          pythonWithPackages = poetryEnv.withPackages (ps: [ package ]);
+        in pkgs.dockerTools.buildLayeredImage {
+          name = "doge-bot";
+          contents = [ pythonWithPackages ];
+          config.Cmd =
+            [ "python" "-m" "maubot.standalone" "-m" ./maubot.yaml ];
+          tag = "latest";
+        };
+
         defaultApp =
           nix-utils.lib.mkApp { drv = self.defaultPackage."${system}"; };
       });
