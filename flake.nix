@@ -14,23 +14,22 @@
           python = python39;
           preferWheels = true;
         };
+        pythonModule = pkgs.poetry2nix.mkPoetryApplication {
+          projectDir = ./.;
+          python = pkgs.python39;
+          preferWheels = true;
+        };
+        pythonWithPackages = poetryEnv.withPackages (ps: [ pythonModule ]);
       in rec {
         devShell = poetryEnv.env.overrideAttrs (oldAttrs: { 
           buildInputs = [ pkgs.poetry ]; 
         });
 
         defaultPackage = writeShellScriptBin "doge-bot" ''
-          ${poetryEnv}/bin/python -m maubot.standalone -m ${./maubot.yaml} "$@"
+          ${pythonWithPackages}/bin/python -m maubot.standalone -m ${./maubot.yaml} "$@"
         '';
 
-        packages.docker = let
-          package = pkgs.poetry2nix.mkPoetryApplication {
-            projectDir = ./.;
-            python = pkgs.python39;
-            preferWheels = true;
-          };
-          pythonWithPackages = poetryEnv.withPackages (ps: [ package ]);
-        in pkgs.dockerTools.buildLayeredImage {
+        packages.docker = pkgs.dockerTools.buildLayeredImage {
           name = "doge-bot";
           contents = [ pythonWithPackages ];
           config.Entrypoint =
