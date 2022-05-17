@@ -55,7 +55,7 @@ class DogeBot(Plugin):
                     else:
                         print("  - rooms", file=output)
                     for room in group.rooms:
-                        print("    - %s" % (room.room_alias), file=output)
+                        print("    - %s" % (room.room_alias_or_id), file=output)
                     if not group.users:
                         print("  - *no users*", file=output)
                     else:
@@ -68,17 +68,17 @@ class DogeBot(Plugin):
     @command.argument("group_name", label="Group name")
     async def create_group(self, evt: MessageEvent, group_name: str) -> None:
         async with self.session(evt) as dbm:
-            if (group := dbm.get_group_by_name(group_name)) is not None:
-                raise UserError("Group **%s** already exist", group.name)
+            if dbm.get_group_by_name(group_name):
+                raise UserError("Group **%s** already exists", group_name)
 
-            dbm.add(group := Group(name=group_name))
+            dbm.add(Group(name=group_name))
             dbm.commit()
 
-            await evt.respond("✅ Group **%s** created" % (group.name))
+            await evt.respond("✅ Group **%s** created" % (group_name))
 
     @command.new(name="rename", help="Change group name")
     @command.argument("group_name", label="Group name")
-    @command.argument("new_name", label="New group name")
+    @command.argument("new_name", label="New name")
     async def rename_group(self, evt: MessageEvent, group_name: str, new_name: str) -> None:
         async with self.session(evt) as dbm:
             if (group := dbm.get_group_by_name(group_name)) is None:
@@ -153,7 +153,7 @@ class DogeBot(Plugin):
 
             if (room := await self.resolve_room(room_id_or_alias)) in group.rooms:
                 raise UserError("Group **%s** is already in room %s",
-                                group.name, room.room_alias)
+                                group.name, room.room_alias_or_id)
 
             if room.room_id not in await self.client.get_joined_rooms():
                 await self.client.join_room_by_id(room.room_id)
@@ -162,7 +162,7 @@ class DogeBot(Plugin):
             dbm.commit()
 
             await self.invite_members(group, rooms=[room])
-            await evt.respond("✅ Added group **%s** to room %s" % (group.name, room.room_alias))
+            await evt.respond("✅ Added group **%s** to room %s" % (group.name, room.room_alias_or_id))
 
     @command.new(name="leave", help="Remove group from room")
     @command.argument("group_name", label="Group name")
@@ -176,13 +176,13 @@ class DogeBot(Plugin):
 
             if (room := await self.resolve_room(room_id_or_alias)) not in group.rooms:
                 raise UserError("Group **%s** is not in room %s",
-                                group.name, room.room_alias)
+                                group.name, room.room_alias_or_id)
 
             group.rooms.remove(room)
             dbm.commit()
 
             await self.remove_members(group, rooms=[room])
-            await evt.respond("✅ Removed group **%s** from room %s" % (group.name, room.room_alias))
+            await evt.respond("✅ Removed group **%s** from room %s" % (group.name, room.room_alias_or_id))
 
     async def invite_members(self, group: Group, rooms: Optional[List[Room]] = None, users: Optional[List[User]] = None):
         for room in rooms or group.rooms:
@@ -206,7 +206,7 @@ class DogeBot(Plugin):
     async def remove_members(self, group: Group, rooms: Optional[List[Room]] = None, users: Optional[List[User]] = None):
         async with self.session() as db:
             for room in rooms or group.rooms:
-                self.log.debug("Inviting group %s users to room %s",
+                self.log.debug("Removing group %s users from room %s",
                                group.name, room.room_alias_or_id)
 
                 other_groups = [other_group for other_group in db.find_groups_by_room(
