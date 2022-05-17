@@ -20,7 +20,7 @@
         });
 
         defaultPackage = writeShellScriptBin "doge-bot" ''
-          ${poetryEnv}/bin/python -m maubot.standalone -m${./maubot.yaml} "$@"
+          ${poetryEnv}/bin/python -m maubot.standalone -m ${./maubot.yaml} "$@"
         '';
 
         packages.docker = let
@@ -33,7 +33,7 @@
         in pkgs.dockerTools.buildLayeredImage {
           name = "doge-bot";
           contents = [ pythonWithPackages ];
-          config.Cmd =
+          config.Entrypoint =
             [ "python" "-m" "maubot.standalone" "-m" ./maubot.yaml ];
           tag = "latest";
         };
