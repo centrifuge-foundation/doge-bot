@@ -27,8 +27,6 @@ Start the bot in standalone mode by running `doge-bot -c <config path>`.
 - `!groups [group name] join [room alias or id]` - invite group to the room
 - `!groups [group name] leave [room alias or id]` - remove group from the room
 
-[room alias or id]: 
-
 ### Docker image
 
 [![Docker image](https://img.shields.io/docker/image/kfactory-dev/doge-bot.svg)](https://hub.docker.com/r/kfactory-dev/doge-bot)
@@ -50,24 +48,4 @@ You can also use `python -m maubot.standalone` to run the bot in the development
 
 ### Generating access token
 
-> The method described in this section uses Maubot server, but there are may be other ways to generate access token.
-
-Copy [example server configuration file](https://raw.githubusercontent.com/maubot/maubot/master/maubot/example-config.yaml) changing admin username and password, and adding your homeserver if necessary.
-
-Start Maubot server, specifying path to the server configuration file:
-
-```
-python -m maubot -c <server config path>
-```
-
-Authenticate with the server using admin credentials specified the configuration file:
-
-```
-mbc login -u <admin username>
-```
-
-Generate access token, specifying a homeserver and a fully-qualified user id:
-
-```
-mbc auth -h <homeserver> -u <user id>
-```
+Run `./scripts/login.sh` script to generate access token.
