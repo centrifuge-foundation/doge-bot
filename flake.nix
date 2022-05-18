@@ -25,14 +25,20 @@
           poetryEnv.env.overrideAttrs (oldAttrs: { buildInputs = [ poetry ]; });
 
         defaultPackage = writeShellScriptBin "doge-bot" ''
-          ${pythonWithPackages}/bin/python -m maubot.standalone -m ${./maubot.yaml} "$@"
+          ${pythonWithPackages}/bin/python -m maubot.standalone -m ${
+            ./maubot.yaml
+          } "$@"
         '';
 
         packages.docker = dockerTools.buildLayeredImage {
           name = "doge-bot";
-          contents = [ pythonWithPackages ];
-          config.Entrypoint =
-            [ "python" "-m" "maubot.standalone" "-m" ./maubot.yaml ];
+          contents = [ pythonWithPackages cacert ];
+          config = {
+            Env = [ "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt" ];
+            Cmd = [ "python" "-m" "maubot.standalone" "-m" ./maubot.yaml ];
+            WorkingDir = "/data";
+            Volumes = { "/data" = { }; };
+          };
           tag = "latest";
         };
 
