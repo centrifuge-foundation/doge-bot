@@ -22,7 +22,7 @@
         pythonWithPackages = poetryEnv.withPackages (ps: [ pythonModule ]);
       in rec {
         devShell = poetryEnv.env.overrideAttrs
-          (oldAttrs: { buildInputs = [ poetry jq ]; });
+          (oldAttrs: { buildInputs = [ poetry jq yq ]; });
 
         defaultPackage = writeShellScriptBin "doge-bot" ''
           ${pythonWithPackages}/bin/python -m maubot.standalone -m ${
