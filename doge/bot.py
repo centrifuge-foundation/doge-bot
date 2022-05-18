@@ -4,11 +4,12 @@ import asyncio
 from contextlib import asynccontextmanager
 from functools import wraps
 from io import StringIO
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Union
 
 from maubot import MessageEvent, Plugin
 from maubot.handlers import command
-from mautrix.errors.request import MNotFound, MForbidden
+from maubot.handlers.command import CommandHandler, CommandHandlerFunc
+from mautrix.errors.request import MForbidden, MNotFound
 from mautrix.types import RoomAlias, RoomID, UserID
 from sqlalchemy import event
 
@@ -19,6 +20,27 @@ from doge.entity import Base, Group, Room, User
 class UserError(Exception):
     def __init__(self, msg: str, *args: object) -> None:
         super().__init__(msg % args)
+
+
+class EmptyCommandHandler(CommandHandler):
+    def __init__(self, func: CommandHandlerFunc) -> None:
+        @wraps(func)
+        async def wrapper(obj, evt: MessageEvent, **kwargs):
+            if any(kwargs.values()):
+                await evt.reply(self.__mb_full_help__)
+            else:
+                await func(obj, evt)
+
+        super().__init__(wrapper)
+
+    @property
+    def __mb_full_help__(self) -> str:
+        usage = self.__mb_usage_without_subcommands__ + "\n\n"
+        # Remove [subcommand] from command listing
+        if not self.__mb_require_subcommand__:
+            usage += f"* {self.__mb_prefix__} - {self.__mb_help__}\n"
+        usage += "\n".join(cmd.__mb_usage_inline__ for cmd in self.__mb_subcommands__)
+        return usage
 
 
 class DogeBot(Plugin):
@@ -42,8 +64,10 @@ class DogeBot(Plugin):
         finally:
             dbm.close()
 
-    @command.new(name="groups", help="List existing groups")
-    async def list_groups(self, evt: MessageEvent):
+    @command.new(help="list existing groups", require_subcommand=False)
+    @command.argument(name="group_name", label="group name", parser=str, required=True)
+    @EmptyCommandHandler
+    async def groups(self, evt: MessageEvent) -> None:
         with StringIO() as output:
             async with self.session(evt) as dbm:
                 if not (groups := dbm.find_all_groups()):
@@ -55,7 +79,8 @@ class DogeBot(Plugin):
                     else:
                         print("  - rooms", file=output)
                     for room in group.rooms:
-                        print("    - %s" % (room.room_alias_or_id), file=output)
+                        print("    - %s" %
+                              (room.room_alias_or_id), file=output)
                     if not group.users:
                         print("  - *no users*", file=output)
                     else:
@@ -64,8 +89,7 @@ class DogeBot(Plugin):
                         print("    - %s" % (user.user_id), file=output)
             await evt.respond(output.getvalue())
 
-    @command.new(name="create", help="Create a new group")
-    @command.argument("group_name", label="Group name")
+    @groups.subcommand(name="create", help="create a new group")
     async def create_group(self, evt: MessageEvent, group_name: str) -> None:
         async with self.session(evt) as dbm:
             if dbm.get_group_by_name(group_name):
@@ -76,9 +100,8 @@ class DogeBot(Plugin):
 
             await evt.respond("✅ Group **%s** created" % (group_name))
 
-    @command.new(name="rename", help="Change group name")
-    @command.argument("group_name", label="Group name")
-    @command.argument("new_name", label="New name")
+    @groups.subcommand(name="rename", help="change group name")
+    @command.argument("new_name", label="new name")
     async def rename_group(self, evt: MessageEvent, group_name: str, new_name: str) -> None:
         async with self.session(evt) as dbm:
             if (group := dbm.get_group_by_name(group_name)) is None:
@@ -92,8 +115,7 @@ class DogeBot(Plugin):
 
             await evt.respond("✅ Group **%s** renamed to **%s**" % (group_name, new_name))
 
-    @command.new(name="delete", help="Delete a group")
-    @command.argument("group_name", label="Group name")
+    @groups.subcommand(name="delete", help="delete a group")
     async def delete_group(self, evt: MessageEvent, group_name: str) -> None:
         async with self.session(evt) as dbm:
             if (group := dbm.get_group_by_name(group_name)) is None:
@@ -105,9 +127,8 @@ class DogeBot(Plugin):
             await self.remove_members(group)
             await evt.respond("✅ Group **%s** deleted" % (group.name))
 
-    @command.new(name="add", help="Add user to group")
-    @command.argument("group_name", label="Group name")
-    @command.argument("user_name", label="User name")
+    @groups.subcommand(name="add", help="add user to group")
+    @command.argument("user_name", label="user name")
     async def add_user_to_group(self, evt: MessageEvent, group_name: str, user_name: str) -> None:
         async with self.session(evt) as dbm:
             if (group := dbm.get_group_by_name(group_name)) is None:
@@ -123,9 +144,8 @@ class DogeBot(Plugin):
             await self.invite_members(group, users=[user])
             await evt.respond("✅ Added user %s to group **%s**" % (user.user_id, group.name))
 
-    @command.new(name="remove", help="Remove user from group")
-    @command.argument("group_name", label="Group name")
-    @command.argument("user_name", label="User name")
+    @groups.subcommand(name="remove", help="remove user from group")
+    @command.argument("user_name", label="user name")
     async def remove_user_from_group(self, evt: MessageEvent, group_name: str, user_name: str) -> None:
         async with self.session(evt) as dbm:
             if (group := dbm.get_group_by_name(group_name)) is None:
@@ -141,9 +161,8 @@ class DogeBot(Plugin):
             await self.remove_members(group, users=[user])
             await evt.respond("✅ Removed user %s from group **%s**" % (user.user_id, group.name))
 
-    @command.new(name="join", help="Add group to room")
-    @command.argument("group_name", label="Group name")
-    @command.argument("room_id_or_alias", label="Room id or alias")
+    @groups.subcommand(name="join", help="add group to room")
+    @command.argument("room_id_or_alias", label="room id or alias")
     async def add_group_to_room(self, evt: MessageEvent, group_name: str, room_id_or_alias: str) -> None:
         room_id_or_alias = self.parse_room_id_or_alias(room_id_or_alias)
 
@@ -164,9 +183,8 @@ class DogeBot(Plugin):
             await self.invite_members(group, rooms=[room])
             await evt.respond("✅ Added group **%s** to room %s" % (group.name, room.room_alias_or_id))
 
-    @command.new(name="leave", help="Remove group from room")
-    @command.argument("group_name", label="Group name")
-    @command.argument("room_id_or_alias", label="Room id or alias")
+    @groups.subcommand(name="leave", help="remove group from room")
+    @command.argument("room_id_or_alias", label="room id or alias")
     async def remove_group_from_room(self, evt: MessageEvent, group_name: str, room_id_or_alias: str) -> None:
         room_id_or_alias = self.parse_room_id_or_alias(room_id_or_alias)
 

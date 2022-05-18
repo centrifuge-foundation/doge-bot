@@ -19,13 +19,15 @@ Start the bot in standalone mode by running `doge-bot -c <config path>`.
 **Available commands:**
 
 - `!groups` - list all existing groups
-- `!create [group name]` - create a new group
-- `!rename [group name] [new name]` - rename a group
-- `!delete [group name]` - delete a group
-- `!add [group name] [user id]` - add member to the group
-- `!remove [group name] [user id]` - remove member from the group
-- `!join [group name] [room alias or id]` - invite group to the room
-- `!leave [group name] [room alias or id]` - remove group from the room
+- `!groups [group name] create` - create a new group
+- `!groups [group name] rename [new name]` - rename a group
+- `!groups [group name] delete` - delete a group
+- `!groups [group name] add [user id]` - add member to the group
+- `!groups [group name] remove [user id]` - remove member from the group
+- `!groups [group name] join [room alias or id]` - invite group to the room
+- `!groups [group name] leave [room alias or id]` - remove group from the room
+
+[room alias or id]: 
 
 ### Docker image
 
